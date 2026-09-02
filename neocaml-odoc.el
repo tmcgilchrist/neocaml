@@ -60,7 +60,7 @@
   :type 'natnum
   :safe 'natnump
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 ;;; Grammar installation
 
@@ -87,109 +87,109 @@ With prefix argument FORCE, reinstall even if already installed."
   '((t :inherit font-lock-function-name-face :weight bold))
   "Face for odoc section headings."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-bold-face
   '((t :inherit bold))
   "Face for bold markup in odoc."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-italic-face
   '((t :inherit italic))
   "Face for italic markup in odoc."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-emphasis-face
   '((t :inherit bold-italic))
   "Face for emphasis markup in odoc."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-tag-face
   '((t :inherit font-lock-keyword-face))
   "Face for documentation tags (@param, @return, etc.)."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-tag-name-face
   '((t :inherit font-lock-variable-name-face))
   "Face for parameter and exception names in tags."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-tag-value-face
   '((t :inherit font-lock-constant-face))
   "Face for version strings in tags."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-code-face
   '((t :inherit (fixed-pitch font-lock-constant-face)))
   "Face for inline code spans and plain code blocks."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-verbatim-face
   '((t :inherit (fixed-pitch font-lock-string-face)))
   "Face for verbatim blocks."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-language-face
   '((t :inherit font-lock-type-face))
   "Face for the language tag in code blocks ({@ocaml[...]})."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-math-face
   '((t :inherit font-lock-string-face))
   "Face for math spans and blocks."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-reference-face
   '((t :inherit link))
   "Face for identifier references ({!Module.foo})."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-link-face
   '((t :inherit link))
   "Face for URL links ({:https://...})."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-escape-face
   '((t :inherit font-lock-escape-face))
   "Face for escape sequences."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-markup-face
   '((t :inherit shadow))
   "Face for structural markup (superscript, subscript delimiters)."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-raw-markup-face
   '((t :inherit font-lock-preprocessor-face))
   "Face for raw markup (embedded HTML/LaTeX)."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-list-face
   '((t :inherit neocaml-odoc-markup-face))
   "Face for list markup."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 (defface neocaml-odoc-bracket-face
   '((t :inherit shadow))
   "Face for odoc bracket delimiters."
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.9.0"))
+  :package-version '(neocaml . "0.11.0"))
 
 ;;; Font-lock
 
@@ -429,7 +429,7 @@ supported languages.
   (when (< (treesit-library-abi-version) 14)
     (error "The odoc grammar requires tree-sitter ABI version 14+, but \
 your Emacs was built against ABI version %d; rebuild Emacs with \
-tree-sitter >= 0.22.0" (treesit-library-abi-version)))
+tree-sitter >= 0.24" (treesit-library-abi-version)))
   (unless (treesit-ready-p 'odoc)
     (when (y-or-n-p "Odoc tree-sitter grammar is not installed.  Install it now?")
       (neocaml-odoc-install-grammar))
