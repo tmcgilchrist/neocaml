@@ -18,8 +18,7 @@
 ;; references, links, tags, lists, tables, and code blocks.  When the
 ;; relevant tree-sitter grammars are installed, embedded code inside
 ;; {@lang[...]} blocks gets full syntax highlighting via language
-;; injection.  Supported languages: OCaml, dune, opam, and
-;; sh/bash.
+;; injection.  Supported languages: OCaml, dune, and opam.
 ;;
 ;; For the tree-sitter grammar this mode is based on,
 ;; see https://github.com/tmcgilchrist/tree-sitter-odoc.
@@ -61,13 +60,13 @@
   :type 'natnum
   :safe 'natnump
   :group 'neocaml-odoc
-  :package-version '(neocaml . "0.8.0"))
+  :package-version '(neocaml . "0.9.0"))
 
 ;;; Grammar installation
 
 (defconst neocaml-odoc-grammar-recipes
   '((odoc "https://github.com/tmcgilchrist/tree-sitter-odoc"
-          "0.1.1"
+          "0.2.0"
           "src"))
   "Tree-sitter grammar recipe for odoc files.
 Each entry is a list of (LANGUAGE URL REV SOURCE-DIR).
@@ -274,7 +273,9 @@ With prefix argument FORCE, reinstall even if already installed."
 
    :language 'odoc
    :feature 'bracket
-   '(["[" "]" "]}" "}" "{b" "{i" "{e" "{^" "{_"
+   '((code_block_open_delimiter) @neocaml-odoc-bracket-face
+     (code_block_delimiter_close) @neocaml-odoc-bracket-face
+     ["[" "]" "]}" "}" "{b" "{i" "{e" "{^" "{_"
       "{!" "{{!" "{:" "{{:" "{%" "{m" "{math" "{@"
       "{[" "{v" "{ul" "{ol" "{li" "{table" "{tr" "{th" "{td" "{t"
       "{L" "{C" "{R" "{!modules:" "%}"
@@ -286,9 +287,7 @@ With prefix argument FORCE, reinstall even if already installed."
 (defvar neocaml-odoc--injection-language-alist
   '(("ocaml" . ocaml)
     ("dune"  . dune)
-    ("opam"  . opam)
-    ("sh"    . bash)
-    ("bash"  . bash))
+    ("opam"  . opam))
   "Alist mapping odoc language tags to tree-sitter grammar symbols.
 Each entry is (TAG . GRAMMAR) where TAG is the string used in
 `{@tag[...]}' blocks and GRAMMAR is the tree-sitter language symbol.")
@@ -321,48 +320,36 @@ Requires Emacs 30+ for `treesit-range-rules' with `:embed'."
 (defun neocaml-odoc--font-lock-settings ()
   "Return font-lock settings for `neocaml-odoc-mode'.
 When language injection is available, includes font-lock rules for
-embedded code inside `{@lang[...]}' blocks.  Otherwise, code block
-content gets a plain string face as fallback."
-  (let ((injections (neocaml-odoc--available-injections)))
-    (append
-     neocaml-odoc--font-lock-settings
-     (if injections
-         (mapcan (lambda (grammar)
-                   (copy-sequence
-                    (neocaml-odoc--font-lock-for-grammar grammar)))
-                 (seq-uniq (mapcar #'cdr injections)))
-       ;; No injection: highlight code_block_content as string
-       (treesit-font-lock-rules
-        :language 'odoc
-        :feature 'code
-        '((code_block_with_lang (code_block_content) @font-lock-string-face)))))))
+embedded code inside `{@lang[...]}' blocks.  The last rule gives the
+body of a code block a plain code face; a language that does inject
+fontifies its own text first, so this only covers the languages that
+don't."
+  (append
+   neocaml-odoc--font-lock-settings
+   (mapcan (lambda (entry)
+             (copy-sequence
+              (neocaml-odoc--font-lock-for-grammar (cdr entry))))
+           (neocaml-odoc--available-injections))
+   (treesit-font-lock-rules
+    :language 'odoc
+    :feature 'code
+    '((code_block_with_lang (code_block_content) @neocaml-odoc-code-face)))))
 
 (defun neocaml-odoc--range-settings ()
   "Return range settings for language injection in code blocks.
 Injects parsers into `{@lang[...]}' blocks for each available grammar.
 Returns nil if no injections are available."
-  (let ((injections (neocaml-odoc--available-injections)))
-    (when injections
-      ;; Group tags by grammar, so e.g. sh and bash produce one rule
-      ;; matching either tag.
-      (let ((by-grammar (make-hash-table :test #'eq)))
-        (dolist (entry injections)
-          (push (car entry) (gethash (cdr entry) by-grammar)))
-        (let ((result nil))
-          (maphash
-           (lambda (grammar tags)
-             (setq result
-                   (nconc result
-                          (treesit-range-rules
-                           :embed grammar
-                           :host 'odoc
-                           :local t
-                           `((code_block_with_lang
-                              (language) @_lang
-                              (code_block_content) @capture
-                              (:match ,(concat "\\`" (regexp-opt tags) "\\'") @_lang)))))))
-           by-grammar)
-          result)))))
+  (mapcan
+   (lambda (entry)
+     (treesit-range-rules
+      :embed (cdr entry)
+      :host 'odoc
+      :local t
+      `((code_block_with_lang
+         (language) @_lang
+         (code_block_content) @capture
+         (:match ,(concat "\\`" (regexp-quote (car entry)) "\\'") @_lang)))))
+   (neocaml-odoc--available-injections)))
 
 ;;; Indentation
 
@@ -403,14 +390,29 @@ See `treesit-simple-imenu-settings' for the format.")
 
 ;;; Navigation
 
+(defun neocaml-odoc--squeeze-whitespace (text)
+  "Return TEXT trimmed, with each run of whitespace collapsed to one space."
+  (string-trim (replace-regexp-in-string "[ \t\n\r]+" " " text)))
+
 (defun neocaml-odoc--defun-name (node)
   "Return a name for NODE suitable for imenu and which-func."
   (let ((type (treesit-node-type node)))
     (cond
+     ;; A heading has no field for its title: it is everything between the
+     ;; {N or {N:label marker and the closing brace, and it may wrap over
+     ;; several lines.
      ((string= type "heading")
-      (string-trim (treesit-node-text node t)))
+      (let* ((count (treesit-node-child-count node))
+             (marker (treesit-node-child node 0))
+             (close (and (> count 1) (treesit-node-child node (1- count))))
+             (title (and marker close
+                         (neocaml-odoc--squeeze-whitespace
+                          (buffer-substring-no-properties
+                           (treesit-node-end marker)
+                           (treesit-node-start close))))))
+        (unless (equal title "") title)))
      ((string-prefix-p "tag_" type)
-      (string-trim (treesit-node-text node t))))))
+      (neocaml-odoc--squeeze-whitespace (treesit-node-text node t))))))
 
 ;;; Mode definition
 
@@ -462,9 +464,9 @@ tree-sitter >= 0.22.0" (treesit-library-abi-version)))
   ;; Imenu
   (setq-local treesit-simple-imenu-settings neocaml-odoc--imenu-settings)
 
-  ;; Navigation
-  (setq-local treesit-defun-type-regexp
-              "\\`\\(?:heading\\|tag_param\\|tag_return\\|tag_raise\\)\\'")
+  ;; Navigation.  Only headings: they are what `C-M-a' and `C-M-e' should
+  ;; move over in a document.
+  (setq-local treesit-defun-type-regexp "\\`heading\\'")
   (setq-local treesit-defun-name-function #'neocaml-odoc--defun-name)
   (setq-local add-log-current-defun-function #'treesit-add-log-current-defun)
 

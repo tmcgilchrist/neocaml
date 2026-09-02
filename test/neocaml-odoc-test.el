@@ -109,7 +109,26 @@ DESCRIPTION is the test name.  Uses `neocaml-odoc-mode'."
 
     (when-fontifying-odoc-it "fontifies emphasis markup"
       ("{e emphasis text}"
-       ("{e emphasis text}" neocaml-odoc-emphasis-face))))
+       ("{e emphasis text}" neocaml-odoc-emphasis-face)))
+
+    (when-fontifying-odoc-it "fontifies markup that spans a newline"
+      ("Some {b bold text\nspanning lines} here."
+       ("bold text" neocaml-odoc-bold-face)
+       ("spanning lines" neocaml-odoc-bold-face)))
+
+    ;; The page title of every dune-released library looks like this; the
+    ;; heading face covers the embedded raw markup along with the rest.
+    (when-fontifying-odoc-it "fontifies a heading that embeds raw markup"
+      ("{0 Fmt {%html: <span>v0.9.0</span>%}}"
+       ("{0 Fmt {%html: <span>v0.9.0</span>%}}" neocaml-odoc-heading-face)))
+
+    (when-fontifying-odoc-it "fontifies raw markup in a paragraph"
+      ("This is a {%html: <strong>strong</strong>%} tag."
+       ("{%html: <strong>strong</strong>%}" neocaml-odoc-raw-markup-face)))
+
+    (when-fontifying-odoc-it "fontifies markup inside a light table cell"
+      ("{t | {e emph} | plain |}"
+       ("{e emph}" neocaml-odoc-emphasis-face))))
 
   (describe "code feature"
     (when-fontifying-odoc-it "fontifies code spans"
@@ -126,7 +145,11 @@ DESCRIPTION is the test name.  Uses `neocaml-odoc-mode'."
 
     (when-fontifying-odoc-it "fontifies verbatim blocks"
       ("{v some verbatim text v}"
-       ("some verbatim text" neocaml-odoc-verbatim-face))))
+       ("some verbatim text" neocaml-odoc-verbatim-face)))
+
+    (when-fontifying-odoc-it "fontifies a delimited code block"
+      ("{delim@ocaml[\nlet x = 1\n]delim}"
+       ("ocaml" neocaml-odoc-language-face))))
 
   (describe "math feature"
     (when-fontifying-odoc-it "fontifies math spans"
@@ -229,6 +252,26 @@ This is some text."))
         (expect (get-text-property (match-beginning 0) 'face)
                 :to-equal 'font-lock-keyword-face)))
 
+    (it "fontifies OCaml keywords inside a delimited code block"
+      (with-temp-buffer
+        (insert "{delim@ocaml[\nlet x = 1\n]delim}")
+        (neocaml-odoc-mode)
+        (font-lock-ensure)
+        (goto-char (point-min))
+        (search-forward "let")
+        (expect (get-text-property (match-beginning 0) 'face)
+                :to-equal 'font-lock-keyword-face)))
+
+    (it "falls back to a code face for languages it cannot inject"
+      (with-temp-buffer
+        (insert "{@python[\nprint(1)\n]}")
+        (neocaml-odoc-mode)
+        (font-lock-ensure)
+        (goto-char (point-min))
+        (search-forward "print")
+        (expect (get-text-property (match-beginning 0) 'face)
+                :to-equal 'neocaml-odoc-code-face)))
+
     (it "fontifies opam keywords inside {@opam[...]} blocks"
       (unless (treesit-language-available-p 'opam)
         (signal 'buttercup-pending "tree-sitter opam grammar not available"))
@@ -240,6 +283,27 @@ This is some text."))
         (search-forward "depends")
         (expect (get-text-property (match-beginning 0) 'face)
                 :to-equal 'font-lock-keyword-face)))))
+
+(describe "neocaml-odoc imenu"
+  (before-all
+    (unless (treesit-language-available-p 'odoc)
+      (signal 'buttercup-pending "tree-sitter odoc grammar not available")))
+
+  (it "names a heading by its title, without the marker"
+    (with-temp-buffer
+      (insert "{0 My Library}\n\n{1:intro Getting\nStarted}\n")
+      (neocaml-odoc-mode)
+      (expect (mapcar #'car (treesit-simple-imenu))
+              :to-equal '("Heading"))
+      (expect (mapcar #'car (cdr (assoc "Heading" (treesit-simple-imenu))))
+              :to-equal '("My Library" "Getting Started"))))
+
+  (it "names a tag by its whole marker"
+    (with-temp-buffer
+      (insert "{0 T}\n\n@param name The name to greet.\n")
+      (neocaml-odoc-mode)
+      (expect (mapcar #'car (cdr (assoc "Tag" (treesit-simple-imenu))))
+              :to-equal '("@param name")))))
 
 (describe "neocaml-odoc integration"
   (before-all

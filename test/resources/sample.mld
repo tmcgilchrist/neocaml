@@ -35,11 +35,10 @@ let greet name =
 let () = greet "world"
 ]}
 
-You can also run shell commands:
+A code block in a language we don't inject still reads as code:
 
-{@sh[
-opam install mylib
-dune build
+{@python[
+print("hello")
 ]}
 
 {2 API Reference}
@@ -63,6 +62,20 @@ type t = {
 The complexity is {m O(n \log n)} for the general case.
 
 {math \sum_{i=0}^{n} x_i^2}
+
+{1 Prose That Wraps}
+
+Inline markup may {b span more than one
+line}, as may {{!Mylib.greet} a reference with
+replacement text}.
+
+- A list item may run onto the following line,
+  which is still part of the same item.
+- A second item.
+
+{t | Syntax | Meaning |
+   |--------|---------|
+   | {e a}  | emphasis |}
 
 {1 Version History}
 

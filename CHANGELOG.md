@@ -2,6 +2,10 @@
 
 ## main (unreleased)
 
+### New features
+
+- [#46](https://github.com/bbatsov/neocaml/pull/46): New `neocaml-odoc-mode` for [odoc](https://ocaml.github.io/odoc/) documentation pages (`.mld`), with font-lock for headings, inline markup, code spans, references, links, tags, lists and tables, indentation, imenu, and language injection into `{@lang[...]}` code blocks for OCaml, dune and opam (Emacs 30+). Install its grammar with `M-x neocaml-odoc-install-grammar`.
+
 ## 0.10.0 (2026-07-10)
 
 ### New features
