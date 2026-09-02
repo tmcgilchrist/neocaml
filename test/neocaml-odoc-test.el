@@ -225,10 +225,8 @@ This is some text."))
           (neocaml-odoc-mode))
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "let")
         ;; Plain code blocks get code face, not keyword face
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-code-face)))
+        (expect "let" :to-have-face 'neocaml-odoc-code-face)))
 
     (it "fontifies OCaml keywords inside {@ocaml[...]} blocks"
       (with-temp-buffer
@@ -236,9 +234,7 @@ This is some text."))
         (neocaml-odoc-mode)
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "let")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'font-lock-keyword-face)))
+        (expect "let" :to-have-face 'font-lock-keyword-face)))
 
     (it "fontifies dune keywords inside {@dune[...]} blocks"
       (unless (treesit-language-available-p 'dune)
@@ -248,9 +244,7 @@ This is some text."))
         (neocaml-odoc-mode)
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "library")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'font-lock-keyword-face)))
+        (expect "library" :to-have-face 'font-lock-keyword-face)))
 
     (it "fontifies OCaml keywords inside a delimited code block"
       (with-temp-buffer
@@ -258,9 +252,7 @@ This is some text."))
         (neocaml-odoc-mode)
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "let")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'font-lock-keyword-face)))
+        (expect "let" :to-have-face 'font-lock-keyword-face)))
 
     (it "falls back to a code face for languages it cannot inject"
       (with-temp-buffer
@@ -268,9 +260,7 @@ This is some text."))
         (neocaml-odoc-mode)
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "print")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-code-face)))
+        (expect "print" :to-have-face 'neocaml-odoc-code-face)))
 
     (it "fontifies opam keywords inside {@opam[...]} blocks"
       (unless (treesit-language-available-p 'opam)
@@ -280,9 +270,7 @@ This is some text."))
         (neocaml-odoc-mode)
         (font-lock-ensure)
         (goto-char (point-min))
-        (search-forward "depends")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'font-lock-keyword-face)))))
+        (expect "depends" :to-have-face 'font-lock-keyword-face)))))
 
 (describe "neocaml-odoc imenu"
   (before-all
@@ -320,30 +308,15 @@ This is some text."))
         (let ((treesit-font-lock-level 4))
           (neocaml-odoc-mode))
         (font-lock-ensure)
-        ;; Check heading
         (goto-char (point-min))
-        (search-forward "{0 My Library}")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-heading-face)
-        ;; Check bold markup
+        (expect "{0 My Library}" :to-have-face 'neocaml-odoc-heading-face)
         (goto-char (point-min))
-        (search-forward "{b bold}")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-bold-face)
-        ;; Check code span
+        (expect "{b bold}" :to-have-face 'neocaml-odoc-bold-face)
         (goto-char (point-min))
-        (search-forward "[t]")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-code-face)
-        ;; Check @since tag
+        (expect "[t]" :to-have-face 'neocaml-odoc-code-face)
         (goto-char (point-min))
-        (search-forward "@since")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-tag-face)
-        ;; Check simple reference
+        (expect "@since" :to-have-face 'neocaml-odoc-tag-face)
         (goto-char (point-min))
-        (search-forward "{!Mylib.greet}")
-        (expect (get-text-property (match-beginning 0) 'face)
-                :to-equal 'neocaml-odoc-reference-face)))))
+        (expect "{!Mylib.greet}" :to-have-face 'neocaml-odoc-reference-face)))))
 
 ;;; neocaml-odoc-test.el ends here
