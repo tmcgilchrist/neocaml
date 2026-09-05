@@ -407,13 +407,19 @@ The return value is suitable for `treesit-font-lock-settings'."
 
    :language language
    :feature 'builtin
+   ;; NOTE: these predicates must not use `regexp-opt' with `symbols', which
+   ;; wraps the alternation in \_< ... \_>.  Evaluating a symbol-boundary
+   ;; assertion inside a `:match' predicate pulls in lazy `syntax-propertize'
+   ;; while `treesit-query-capture' is still walking the query cursor, which
+   ;; segfaults Emacs 31.1 (bug#81729, neocaml#67).  The captures are whole
+   ;; nodes, so anchoring the match to the node text is both safe and exact.
    `(((value_path :anchor (value_name) @font-lock-builtin-face)
-      (:match ,(regexp-opt neocaml-mode--builtin-ids 'symbols) @font-lock-builtin-face))
+      (:match ,(concat "\\`" (regexp-opt neocaml-mode--builtin-ids) "\\'") @font-lock-builtin-face))
      ((constructor_path :anchor (constructor_name) @font-lock-builtin-face)
-      (:match ,(regexp-opt neocaml-mode--builtin-ids 'symbols) @font-lock-builtin-face))
+      (:match ,(concat "\\`" (regexp-opt neocaml-mode--builtin-ids) "\\'") @font-lock-builtin-face))
      ;; Builtin types (int, string, bool, etc.)
      ((type_constructor) @font-lock-builtin-face
-      (:match ,(regexp-opt neocaml-mode--builtin-types 'symbols) @font-lock-builtin-face)))
+      (:match ,(concat "\\`" (regexp-opt neocaml-mode--builtin-types) "\\'") @font-lock-builtin-face)))
 
    ;; See https://ocaml.org/manual/5.3/const.html
    :language language
