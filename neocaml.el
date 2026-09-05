@@ -948,8 +948,9 @@ fall back to syntax-table-based matching so that commands like
 `delete-pair' find the correct matching delimiter.  Otherwise,
 use tree-sitter sexp navigation.
 
-This function is used on Emacs 29 and 30.  Emacs 31+ handles
-this natively via the `list' thing in `treesit-thing-settings'.
+Used on every Emacs version: `treesit-forward-sexp' lacks the
+`scan-sexps' fallback and `treesit-forward-sexp-list' ignores the
+`sexp' thing, so neither built-in does both.
 
 ARG is as in `forward-sexp-function'."
   (let ((arg (or arg 1)))
@@ -1559,13 +1560,22 @@ the language-specific parts of the mode."
                (boundp 'forward-comment-function))
       (setq-local forward-comment-function #'neocaml--forward-comment))
 
-    ;; On Emacs 30, treesit-major-mode-setup sets forward-sexp-function
-    ;; to treesit-forward-sexp, which doesn't fall back to scan-sexps
-    ;; for delimiter characters.  This breaks commands like delete-pair.
-    ;; Use a hybrid function that delegates to scan-sexps on delimiters.
-    ;; Emacs 31+ handles this natively via the `list' thing.
-    (unless (fboundp 'treesit-forward-sexp-list)
-      (setq-local forward-sexp-function #'neocaml--forward-sexp-hybrid))
+    ;; treesit-major-mode-setup picks a `forward-sexp-function' for us, but
+    ;; neither choice is right for OCaml:
+    ;;
+    ;;   - Emacs 30 uses `treesit-forward-sexp', which doesn't fall back to
+    ;;     scan-sexps for delimiter characters, breaking `delete-pair'.
+    ;;   - Emacs 31 sees our `list' thing and uses `treesit-forward-sexp-list',
+    ;;     which moves across lists but delegates *atoms* to
+    ;;     `forward-sexp-default-function', ignoring the `sexp' thing entirely.
+    ;;     Keyword-led forms are then treated as bare words, so C-M-f stops
+    ;;     after `fun', `function', `if', `match' or `external' instead of
+    ;;     moving over the whole construct.
+    ;;
+    ;; Use the hybrid on every version: it walks sexps with tree-sitter and
+    ;; delegates to scan-sexps only on delimiters, which keeps `delete-pair'
+    ;; working without giving up sexp navigation.
+    (setq-local forward-sexp-function #'neocaml--forward-sexp-hybrid)
 
     ;; Workaround for treesit-transpose-sexps being broken on Emacs 30
     ;; (bug#60655).  Emacs 31 rewrites the function to work correctly.
