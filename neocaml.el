@@ -1801,6 +1801,7 @@ the language-specific parts of the mode."
   (when (boundp 'eglot-server-programs)
     (add-to-list 'eglot-server-programs
                  '(((neocaml-mode :language-id "ocaml")
+                    (neocaml-mlx-mode :language-id "ocaml")
                     (neocaml-interface-mode
                      :language-id "ocaml.interface"))
                    "ocamllsp"))))
@@ -1812,7 +1813,8 @@ the language-specific parts of the mode."
       (let ((modes (plist-get cfg 'modes)))
         (unless (memq 'neocaml-mode modes)
           (plist-put cfg 'modes
-                     (append '(neocaml-mode neocaml-interface-mode)
+                     (append '(neocaml-mode neocaml-mlx-mode
+                               neocaml-interface-mode)
                              modes)))))))
 
 (define-derived-mode neocaml-base-mode prog-mode "OCaml"

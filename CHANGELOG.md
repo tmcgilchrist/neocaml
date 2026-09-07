@@ -9,6 +9,7 @@
 ### Changes
 
 - [#80](https://github.com/bbatsov/neocaml/pull/80): Use the hybrid forward-sexp function on every Emacs version, so `C-M-f` moves over whole keyword-led forms (`fun`, `match`, `if`, etc.) on Emacs 31+ instead of stopping after the keyword.
+- [#77](https://github.com/bbatsov/neocaml/pull/77): Add `neocaml-mlx`, a major mode for `.mlx` files.
 
 ### Bug fixes
 
