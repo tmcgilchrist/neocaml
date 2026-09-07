@@ -190,10 +190,10 @@ when the element never closes."
 
 (defun neocaml-mlx--jsx-range (node limit)
   "Return the JSX region belonging to NODE as a list of (BEG . END).
-NODE is the `value_definition' of a component binding.  The search
-starts at NODE and runs no further than LIMIT, which should be the start
-of the next component binding, or `point-max' for the last one.  Return
-nil when no complete JSX element is found.
+NODE is the JSX-transform `attribute' of a component binding.  The
+search starts at NODE and runs no further than LIMIT, which should be
+the start of the next component's attribute, or `point-max' for the last
+one.  Return nil when no complete JSX element is found.
 
 Neither boundary comes from NODE.  The OCaml parser mis-parses JSX as a
 tangle of infix expressions and `ERROR' nodes, so for a self-closing
@@ -219,9 +219,12 @@ The query is compiled once and reused until
 runs this on every jit-lock chunk and on every indent command, so
 rebuilding and recompiling the query per call is a per-keystroke cost.
 
-The whole `value_definition' is captured rather than its `let_binding':
-after error recovery the JSX is frequently not inside the binding at
-all."
+The `attribute' is captured rather than the `let_binding': after error
+recovery the JSX is frequently not inside the binding at all, so the
+binding's extent is no use.  The capture has to sit at the same paren
+level as the predicate that filters it; capturing the enclosing
+`value_definition' instead puts the two in separate patterns, which
+Emacs 30 rejects at query time even though Emacs 31 accepts it."
   (let ((regexp neocaml-mlx-jsx-attribute-regexp))
     (unless (equal (car neocaml-mlx--component-query-cache) regexp)
       (setq neocaml-mlx--component-query-cache
@@ -230,8 +233,7 @@ all."
                    'ocaml
                    `((value_definition
                       (attribute (attribute_id) @_jsx_attr
-                                 (:match ,regexp @_jsx_attr)))
-                     @mlx)))))
+                                 (:match ,regexp @_jsx_attr)) @mlx))))))
     (cdr neocaml-mlx--component-query-cache)))
 
 (defun neocaml-mlx--set-ranges (_start _end)
@@ -413,6 +415,7 @@ automatically."
   (neocaml-mlx--merge-feature-lists
    treesit-font-lock-feature-list
    (neocaml-mlx--tsx-feature-list)))
+
 ;;; Indentation
 
 (defun neocaml-mlx--jsx-indent-rules ()

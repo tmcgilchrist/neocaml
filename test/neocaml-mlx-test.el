@@ -243,6 +243,20 @@ recomputed from scratch."
       (indent-for-tab-command)
       (expect (current-indentation) :to-equal 4)))
 
+  (it "still indents OCaml the way neocaml-mode does"
+    ;; neocaml-mlx-mode replaces `treesit-indent-function' for the whole
+    ;; buffer, so a mistake in the JSX path would break every OCaml line
+    ;; in a .mlx file.
+    (let ((source "let f x =\nlet y = x + 1 in\ny\n;;\n"))
+      (dolist (mode '(neocaml-mode neocaml-mlx-mode))
+        (with-temp-buffer
+          (insert source)
+          (funcall mode)
+          (goto-char (point-min))
+          (forward-line 1)
+          (indent-for-tab-command)
+          (expect (current-indentation) :to-equal 2)))))
+
   (it "aligns a closing tag with its opening element"
     (with-temp-buffer
       (insert "let[@react.component] make () =\n  <div>\n    <h1>hi</h1>\n</div>\n;;")
