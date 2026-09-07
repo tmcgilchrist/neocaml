@@ -61,6 +61,7 @@
 ;;; Code:
 
 (require 'treesit)
+(require 'seq)
 (require 'neocaml)
 (require 'typescript-ts-mode)
 
@@ -69,6 +70,10 @@
                   "typescript-ts-mode" (language))
 (declare-function tsx-ts-mode--font-lock-compatibility-bb1f97b
                   "typescript-ts-mode" (language))
+;; Emacs 31+; this file still has to byte-compile on 29 and 30, where
+;; `neocaml-mlx--injection-available-p' keeps it from ever being called.
+(declare-function treesit-merge-font-lock-feature-list
+                  "treesit" (list1 list2))
 (defvar neocaml--imenu-settings)
 
 (defgroup neocaml-mlx nil
@@ -290,24 +295,16 @@ covering its JSX element."
   "Return this buffer's `tsx' parser, or nil.
 `treesit-parser-list' only grew its LANGUAGE argument in Emacs 30, and
 this file still has to byte-compile on 29."
-  (let ((parsers (treesit-parser-list))
-        (found nil))
-    (while (and parsers (null found))
-      (let ((parser (pop parsers)))
-        (when (eq (treesit-parser-language parser) 'tsx)
-          (setq found parser))))
-    found))
+  (seq-find (lambda (parser)
+              (eq (treesit-parser-language parser) 'tsx))
+            (treesit-parser-list)))
 
 (defun neocaml-mlx--jsx-region-p (pos)
   "Non-nil when POS falls inside an injected JSX range."
   (when-let* ((parser (neocaml-mlx--tsx-parser)))
-    (let ((ranges (treesit-parser-included-ranges parser))
-          (found nil))
-      (while (and ranges (not found))
-        (let ((range (pop ranges)))
-          (when (and (>= pos (car range)) (< pos (cdr range)))
-            (setq found t))))
-      found)))
+    (seq-find (lambda (range)
+                (and (>= pos (car range)) (< pos (cdr range))))
+              (treesit-parser-included-ranges parser))))
 
 (defun neocaml-mlx--language-at-point (pos)
   "Return the tree-sitter language that owns POS.
@@ -401,29 +398,20 @@ is about to be killed."
               (delay-mode-hooks (tsx-ts-mode))
               treesit-font-lock-feature-list))))
 
-(defun neocaml-mlx--merge-feature-lists (a b)
-  "Return a fresh feature list merging the levels of A and B.
-Every level is freshly consed, so the result shares no structure with
-either argument.  That matters: the inputs are the quoted literals
-inside `neocaml.el' and `typescript-ts-mode.el', and a caller that
-modified the merged list in place would otherwise corrupt font-lock for
-every OCaml and TSX buffer in the session."
-  (let ((levels (max (length a) (length b)))
-        (result nil))
-    (dotimes (i levels)
-      ;; The trailing nil makes `append' copy its last argument too.
-      (push (delete-dups (append (nth i a) (nth i b) nil)) result))
-    (nreverse result)))
-
 (defun neocaml-mlx--font-lock-feature-list ()
   "Return the feature list merging `ocaml' and `tsx' feature levels.
 The current buffer is expected to have been configured by
 `neocaml--setup-mode'.  The TSX list is obtained from `tsx-ts-mode' so
 changes to either mode's feature levels are reflected here
 automatically."
-  (neocaml-mlx--merge-feature-lists
-   treesit-font-lock-feature-list
-   (neocaml-mlx--tsx-feature-list)))
+  ;; `treesit-merge-font-lock-feature-list' is built on `cl-union', which
+  ;; returns one of its arguments unchanged when the other adds nothing.
+  ;; The arguments here are the quoted literals inside `neocaml.el' and
+  ;; `typescript-ts-mode.el', so without a copy a caller that modified
+  ;; the result in place would rewrite them for every buffer.
+  (copy-tree (treesit-merge-font-lock-feature-list
+              treesit-font-lock-feature-list
+              (neocaml-mlx--tsx-feature-list))))
 
 ;;; Indentation
 

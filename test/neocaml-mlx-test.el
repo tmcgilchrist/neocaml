@@ -284,39 +284,29 @@ recomputed from scratch."
       (expect (current-indentation) :to-equal 2))))
 
 (describe "neocaml-mlx font-lock feature list"
-  (it "shares no structure with the lists it merges"
-    ;; The inputs are the quoted literals inside neocaml.el and
-    ;; typescript-ts-mode.el.  `cl-union' returns one of its arguments
-    ;; unchanged when the other adds nothing, which would alias them.
-    (let* ((a '((comment definition) (keyword string type)))
-           (b '((comment declaration) (keyword string)))
-           (merged (neocaml-mlx--merge-feature-lists a b)))
-      (expect merged :to-equal '((comment definition declaration)
-                                 (keyword string type)))
-      (dolist (level (append a b))
-        (dolist (merged-level merged)
-          (expect (eq level merged-level) :to-be nil)))))
+  (before-all
+    (unless (neocaml-mlx--injection-available-p)
+      (signal 'buttercup-pending
+              "tsx tree-sitter grammar or Emacs 31+ not available")))
 
-  (it "survives a caller modifying the merged list in place"
-    ;; A destructive caller must not be able to rewrite the constants
-    ;; that every neocaml-mode and tsx-ts-mode buffer shares.
-    (let* ((a (list (list 'comment 'definition) (list 'keyword)))
-           (b (list (list 'jsx) (list 'string)))
-           (a-copy (copy-tree a))
-           (b-copy (copy-tree b))
-           (merged (neocaml-mlx--merge-feature-lists a b)))
-      (apply #'nconc merged)
-      (expect a :to-equal a-copy)
-      (expect b :to-equal b-copy)))
-
-  (it "does not call `treesit-merge-font-lock-feature-list'"
-    ;; It is built on `cl-union', which aliases its argument instead of
-    ;; copying.  Make it explode to prove nothing reaches it.
-    (cl-letf (((symbol-function 'treesit-merge-font-lock-feature-list)
-               (lambda (&rest _)
-                 (error "treesit-merge-font-lock-feature-list is Emacs 31+"))))
-      (expect (neocaml-mlx--merge-feature-lists '((a)) '((b)))
-              :to-equal '((a b)))))
+  (it "does not let a caller corrupt the merged modes' feature lists"
+    ;; `treesit-merge-font-lock-feature-list' is `cl-union'-based and can
+    ;; return one of its arguments unchanged, which would alias the
+    ;; quoted literals in neocaml.el and typescript-ts-mode.el.  Left
+    ;; aliased, a destructive caller rewrites font-lock for every OCaml
+    ;; buffer in the session, and a second mlx activation makes the list
+    ;; circular.
+    (let ((ocaml-before (with-temp-buffer
+                          (neocaml-mode)
+                          (copy-tree treesit-font-lock-feature-list))))
+      (with-temp-buffer
+        (insert neocaml-mlx-test--react-component)
+        (neocaml-mlx-mode)
+        (apply #'nconc treesit-font-lock-feature-list))
+      (expect (with-temp-buffer
+                (neocaml-mode)
+                treesit-font-lock-feature-list)
+              :to-equal ocaml-before)))
 
   (it "computes the tsx feature list without running mode hooks"
     ;; Activating tsx-ts-mode in a temp buffer would otherwise start lsp,
