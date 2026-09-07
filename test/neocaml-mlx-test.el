@@ -72,7 +72,7 @@ recomputed from scratch."
     (before-all
       (unless (neocaml-mlx--injection-available-p)
         (signal 'buttercup-pending
-                "tsx tree-sitter grammar or Emacs 30+ not available")))
+                "tsx tree-sitter grammar or Emacs 31+ not available")))
 
     (it "configures `treesit-range-settings'"
       (with-neocaml-test-buffer neocaml-mlx-mode neocaml-mlx-test--react-component
@@ -149,7 +149,7 @@ recomputed from scratch."
   (before-all
     (unless (neocaml-mlx--injection-available-p)
       (signal 'buttercup-pending
-              "tsx tree-sitter grammar or Emacs 30+ not available")))
+              "tsx tree-sitter grammar or Emacs 31+ not available")))
 
   ;; The OCaml grammar has no notion of JSX, so the extent of the node the
   ;; query matches says very little about where the JSX actually is.  Each
@@ -193,6 +193,15 @@ recomputed from scratch."
                      "let[@react.component] b () = <Bar></Bar>\n;;"))
             :to-equal '("<Foo />" "<Bar></Bar>")))
 
+  (it "honours `neocaml-mlx-jsx-attribute-regexp'"
+    ;; The regexp is applied in Lisp, not as a query predicate, so this
+    ;; is what pins it to the right attribute.
+    (let ((source "let[@jsx] make () = <div></div>\n;;"))
+      (expect (neocaml-mlx-test--injected-texts source) :to-equal nil)
+      (let ((neocaml-mlx-jsx-attribute-regexp "jsx"))
+        (expect (neocaml-mlx-test--injected-texts source)
+                :to-equal '("<div></div>")))))
+
   (it "does not inject into a binding without JSX"
     (expect (neocaml-mlx-test--injected-texts
              "let[@react.component] make () = print_endline \"plain\"")
@@ -202,7 +211,7 @@ recomputed from scratch."
   (before-all
     (unless (neocaml-mlx--injection-available-p)
       (signal 'buttercup-pending
-              "tsx tree-sitter grammar or Emacs 30+ not available")))
+              "tsx tree-sitter grammar or Emacs 31+ not available")))
 
   (it "fontifies a self-closing tag, its delimiters and its attributes"
     (with-temp-buffer
@@ -221,7 +230,22 @@ recomputed from scratch."
   (before-all
     (unless (neocaml-mlx--injection-available-p)
       (signal 'buttercup-pending
-              "tsx tree-sitter grammar or Emacs 30+ not available")))
+              "tsx tree-sitter grammar or Emacs 31+ not available")))
+
+  (it "reports the right language inside and outside JSX"
+    ;; The tsx parser's ranges are set directly rather than through
+    ;; range overlays, so `treesit-language-at' needs an explicit
+    ;; function to see the injected regions at all.
+    (with-temp-buffer
+      (insert neocaml-mlx-test--react-component)
+      (neocaml-mlx-mode)
+      (treesit-update-ranges)
+      (goto-char (point-min))
+      (search-forward "<h1>")
+      (expect (treesit-language-at (match-beginning 0)) :to-equal 'tsx)
+      (goto-char (point-min))
+      (search-forward "module")
+      (expect (treesit-language-at (match-beginning 0)) :to-equal 'ocaml)))
 
   (it "indents a nested JSX element under its parent"
     (with-temp-buffer
@@ -286,8 +310,8 @@ recomputed from scratch."
       (expect b :to-equal b-copy)))
 
   (it "does not call `treesit-merge-font-lock-feature-list'"
-    ;; That function is new in Emacs 31, but injection is advertised for
-    ;; Emacs 30+.  Make it explode to prove nothing reaches it.
+    ;; It is built on `cl-union', which aliases its argument instead of
+    ;; copying.  Make it explode to prove nothing reaches it.
     (cl-letf (((symbol-function 'treesit-merge-font-lock-feature-list)
                (lambda (&rest _)
                  (error "treesit-merge-font-lock-feature-list is Emacs 31+"))))
@@ -320,21 +344,14 @@ recomputed from scratch."
     (let ((neocaml-mlx--component-query-cache nil))
       (expect (eq (neocaml-mlx--component-query)
                   (neocaml-mlx--component-query))
-              :to-be t)))
+              :to-be t))))
 
-  (it "recompiles when the attribute regexp changes"
-    (let* ((neocaml-mlx--component-query-cache nil)
-           (first (let ((neocaml-mlx-jsx-attribute-regexp "react\\.component"))
-                    (neocaml-mlx--component-query)))
-           (second (let ((neocaml-mlx-jsx-attribute-regexp "jsx"))
-                     (neocaml-mlx--component-query))))
-      (expect (eq first second) :to-be nil))))
 
 (describe "neocaml-mlx grammar installation"
   (before-all
     (unless (neocaml-mlx--injection-available-p)
       (signal 'buttercup-pending
-              "tsx tree-sitter grammar or Emacs 30+ not available")))
+              "tsx tree-sitter grammar or Emacs 31+ not available")))
 
   (it "sets up injection in the activation that installs the grammar"
     ;; Prompting at the end of the mode body installed the grammar but

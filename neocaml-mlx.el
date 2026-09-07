@@ -118,8 +118,15 @@ which excludes the surrounding `[@' and `]'."
 
 (defun neocaml-mlx--injection-available-p ()
   "Non-nil if `tsx' language injection is available.
-Requires Emacs 30+ and the `tsx' tree-sitter grammar."
-  (and (>= emacs-major-version 30)
+Requires Emacs 31+ and the `tsx' tree-sitter grammar.
+
+Emacs 30 cannot support this: a query against a parser whose ranges were
+set with `treesit-parser-set-included-ranges' returns no captures there,
+so neither the JSX font-lock rules nor the JSX indent rules ever match.
+Going through `:embed'/`:host' range rules instead is not an option
+either, because the JSX region is not expressible as a tree-sitter query
+- that is why `neocaml-mlx--set-ranges' exists."
+  (and (>= emacs-major-version 31)
        (treesit-language-available-p 'tsx)))
 
 (defconst neocaml-mlx--non-code-node-types
@@ -187,7 +194,7 @@ when the element never closes."
 
 (defun neocaml-mlx--jsx-range (node limit)
   "Return the JSX region belonging to NODE as a cons of (BEG . END).
-NODE is the JSX-transform `attribute' of a component binding.  The
+NODE is the JSX-transform `attribute_id' of a component binding.  The
 search starts at NODE and runs no further than LIMIT, which should be
 the start of the next component's attribute, or `point-max' for the last
 one.  Return nil when no complete JSX element is found.
@@ -207,31 +214,39 @@ it, the JSX sits outside NODE's extent entirely."
         (cons start end)))))
 
 (defvar neocaml-mlx--component-query-cache nil
-  "Cons of (REGEXP . QUERY) caching the compiled component query.")
+  "Compiled query matching attributed definitions, built on first use.")
 
 (defun neocaml-mlx--component-query ()
-  "Return the compiled tree-sitter query matching JSX component bindings.
-The query is compiled once and reused until
-`neocaml-mlx-jsx-attribute-regexp' changes.  `treesit-update-ranges'
-runs this on every jit-lock chunk and on every indent command, so
-rebuilding and recompiling the query per call is a per-keystroke cost.
+  "Return the compiled query matching attributed `let' bindings.
+`treesit-update-ranges' runs this on every jit-lock chunk and on every
+indent command, so the query is compiled once and reused.
 
-The `attribute' is captured rather than the `let_binding': after error
-recovery the JSX is frequently not inside the binding at all, so the
-binding's extent is no use.  The capture has to sit at the same paren
-level as the predicate that filters it; capturing the enclosing
-`value_definition' instead puts the two in separate patterns, which
-Emacs 30 rejects at query time even though Emacs 31 accepts it."
-  (let ((regexp neocaml-mlx-jsx-attribute-regexp))
-    (unless (equal (car neocaml-mlx--component-query-cache) regexp)
+The query is deliberately predicate-free.  A `:match' predicate has to
+resolve its capture within the same tree-sitter pattern, and how that
+resolution behaves for a capture nested inside a sub-pattern differs
+between Emacs versions - Emacs 30 rejects what Emacs 31 accepts.
+Filtering in Lisp instead sidesteps that, and lets the query be a
+constant rather than something rebuilt whenever
+`neocaml-mlx-jsx-attribute-regexp' changes."
+  (or neocaml-mlx--component-query-cache
       (setq neocaml-mlx--component-query-cache
-            (cons regexp
-                  (treesit-query-compile
-                   'ocaml
-                   `((value_definition
-                      (attribute (attribute_id) @_jsx_attr
-                                 (:match ,regexp @_jsx_attr)) @mlx))))))
-    (cdr neocaml-mlx--component-query-cache)))
+            (treesit-query-compile
+             'ocaml
+             '((value_definition (attribute (attribute_id) @attr)))))))
+
+(defun neocaml-mlx--component-attributes (root)
+  "Return the JSX-transform `attribute_id' nodes under ROOT.
+Nodes come back in document order, which `neocaml-mlx--set-ranges' needs
+to bound each component by the next.  `treesit-query-capture' does not
+document its ordering, so sort explicitly."
+  (let ((matches nil))
+    (dolist (node (treesit-query-capture
+                   root (neocaml-mlx--component-query) nil nil t))
+      (when (string-match-p neocaml-mlx-jsx-attribute-regexp
+                            (treesit-node-text node t))
+        (push node matches)))
+    (sort matches
+          (lambda (a b) (< (treesit-node-start a) (treesit-node-start b))))))
 
 (defun neocaml-mlx--set-ranges (_start _end)
   "Set the `tsx' parser's included ranges for JSX component bindings.
@@ -247,12 +262,8 @@ component, so a region can extend past the host node's end."
     ;; can let query predicates invoke syntax-propertize out of order.
     (widen)
     (let* ((tsx-parser (treesit-parser-create 'tsx))
-           (nodes (sort (treesit-query-capture
-                         (treesit-buffer-root-node 'ocaml)
-                         (neocaml-mlx--component-query)
-                         nil nil t)
-                        (lambda (a b)
-                          (< (treesit-node-start a) (treesit-node-start b)))))
+           (nodes (neocaml-mlx--component-attributes
+                   (treesit-buffer-root-node 'ocaml)))
            (ranges nil))
       (while nodes
         (let* ((node (pop nodes))
@@ -297,6 +308,13 @@ this file still has to byte-compile on 29."
           (when (and (>= pos (car range)) (< pos (cdr range)))
             (setq found t))))
       found)))
+
+(defun neocaml-mlx--language-at-point (pos)
+  "Return the tree-sitter language that owns POS.
+`treesit-language-at' resolves by parser range, and this mode sets the
+`tsx' parser's ranges directly rather than through range overlays, so
+without this it reports `ocaml' even inside JSX."
+  (if (neocaml-mlx--jsx-region-p pos) 'tsx 'ocaml))
 
 (defun neocaml-mlx--tsx-indent-context (bol)
   "Return (NODE . PARENT) at BOL resolved against the `tsx' parser.
@@ -468,7 +486,7 @@ the mode degrades gracefully to plain `neocaml-mode' behaviour.
   ;; when the grammar is missing, so prompting at the end of the mode
   ;; body would install it and still leave this buffer without JSX
   ;; support until the mode was re-run.
-  (when (and (>= emacs-major-version 30)
+  (when (and (>= emacs-major-version 31)
              (not (treesit-language-available-p 'tsx))
              (y-or-n-p "The tsx (JSX) tree-sitter grammar is not installed; \
 JSX highlighting needs it.  Install it now?"))
@@ -481,7 +499,10 @@ JSX highlighting needs it.  Install it now?"))
   ;; settings reference the host `ocaml' grammar and are honoured once
   ;; that parser exists.
   (when (neocaml-mlx--injection-available-p)
-    (setq-local treesit-range-settings (neocaml-mlx--range-settings)))
+    (setq-local treesit-range-settings (neocaml-mlx--range-settings))
+    ;; Mandatory in a multi-language buffer; see the function's docstring.
+    (setq-local treesit-language-at-point-function
+                #'neocaml-mlx--language-at-point))
 
   ;; Full OCaml setup: ocaml parser, font-lock, indent, navigation, ...
   ;; This installs its own `treesit-font-lock-settings', so the tsx rules

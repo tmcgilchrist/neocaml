@@ -57,7 +57,7 @@ One last thing - we really need more Emacs packages with fun names! :D
 - dune build commands (`neocaml-dune-interaction-mode`) -- build, test, clean, promote, fmt, exec (with watch mode via prefix arg)
 - OCamllex file editing (`neocaml-ocamllex-mode`) with font-lock, indentation, imenu, and OCaml language injection (Emacs 30+)
 - Menhir file editing (`neocaml-menhir-mode`) with font-lock, indentation, imenu, and OCaml language injection (Emacs 30+)
-- OCaml/JSX file editing (`neocaml-mlx-mode`) for `.mlx` files (Melange/React and similar PPX-driven OCaml-JSX), with embedded JSX highlighting via `tsx` language injection (Emacs 30+)
+- OCaml/JSX file editing (`neocaml-mlx-mode`) for `.mlx` files (Melange/React and similar PPX-driven OCaml-JSX), with embedded JSX highlighting via `tsx` language injection (Emacs 31+)
 - Cram test file editing (`neocaml-cram-mode`) with font-lock for commands, output, modifiers, and prose
 - Easy installation of `ocaml` and `ocaml-interface` tree-sitter grammars via `M-x neocaml-install-grammars` (and the `tsx`/JSX grammar via `M-x neocaml-mlx-install-grammar`)
 - Compilation error regexp for `M-x compile` (errors, warnings, alerts, backtraces)
