@@ -174,22 +174,19 @@ when the element never closes."
       (while (and (null end)
                   (re-search-forward neocaml-mlx--jsx-tag-regexp limit t))
         (cond
-         ;; `</foo>' closes the element opened most recently.
          ((match-beginning 1)
           (setq depth (1- depth))
           (when (<= depth 0)
             (setq end (match-end 0))))
-         ;; `<foo />' is a complete element on its own.
          ((match-beginning 2)
           (when (zerop depth)
             (setq end (match-end 0))))
-         ;; `<foo>' opens an element.
          (t
           (setq depth (1+ depth)))))
       end)))
 
 (defun neocaml-mlx--jsx-range (node limit)
-  "Return the JSX region belonging to NODE as a list of (BEG . END).
+  "Return the JSX region belonging to NODE as a cons of (BEG . END).
 NODE is the JSX-transform `attribute' of a component binding.  The
 search starts at NODE and runs no further than LIMIT, which should be
 the start of the next component's attribute, or `point-max' for the last
@@ -207,7 +204,7 @@ it, the JSX sits outside NODE's extent entirely."
       (goto-char (treesit-node-start node))
       (when-let* ((start (neocaml-mlx--search-jsx-start limit))
                   (end (neocaml-mlx--jsx-end start limit)))
-        (list (cons start end))))))
+        (cons start end)))))
 
 (defvar neocaml-mlx--component-query-cache nil
   "Cons of (REGEXP . QUERY) caching the compiled component query.")
@@ -261,8 +258,10 @@ component, so a region can extend past the host node's end."
         (let* ((node (pop nodes))
                (limit (if nodes
                           (treesit-node-start (car nodes))
-                        (point-max))))
-          (setq ranges (nconc ranges (neocaml-mlx--jsx-range node limit)))))
+                        (point-max)))
+               (range (neocaml-mlx--jsx-range node limit)))
+          (when range (push range ranges))))
+      (setq ranges (nreverse ranges))
       ;; An empty list makes a parser cover the whole buffer, so use a
       ;; degenerate range when there is no JSX to parse.
       (treesit-parser-set-included-ranges
@@ -298,14 +297,6 @@ this file still has to byte-compile on 29."
           (when (and (>= pos (car range)) (< pos (cdr range)))
             (setq found t))))
       found)))
-
-(defun neocaml-mlx--language-at-point (pos)
-  "Return the tree-sitter language that owns POS.
-`neocaml-mlx--set-ranges' drives the `tsx' parser directly instead of
-going through `:embed'/`:host' range rules, so treesit has no range
-overlays to consult and `treesit-language-at' would otherwise resolve
-every position to `ocaml' - leaving the JSX indent rules unreachable."
-  (if (neocaml-mlx--jsx-region-p pos) 'tsx 'ocaml))
 
 (defun neocaml-mlx--tsx-indent-context (bol)
   "Return (NODE . PARENT) at BOL resolved against the `tsx' parser.
@@ -490,11 +481,7 @@ JSX highlighting needs it.  Install it now?"))
   ;; settings reference the host `ocaml' grammar and are honoured once
   ;; that parser exists.
   (when (neocaml-mlx--injection-available-p)
-    (setq-local treesit-range-settings (neocaml-mlx--range-settings))
-    ;; Resolve positions inside an injected range to `tsx', so the JSX
-    ;; indent rules added below are reachable.
-    (setq-local treesit-language-at-point-function
-                #'neocaml-mlx--language-at-point))
+    (setq-local treesit-range-settings (neocaml-mlx--range-settings)))
 
   ;; Full OCaml setup: ocaml parser, font-lock, indent, navigation, ...
   ;; This installs its own `treesit-font-lock-settings', so the tsx rules
@@ -523,7 +510,7 @@ JSX highlighting needs it.  Install it now?"))
     (setq-local treesit-simple-indent-rules
                 (append treesit-simple-indent-rules
                         `((tsx ,@(neocaml-mlx--jsx-indent-rules)))))
-    ;; ... and route indentation inside injected regions to them.
+    ;; Route indentation inside those regions to them.
     (setq-local treesit-indent-function #'neocaml-mlx--indent)))
 
 ;;;###autoload

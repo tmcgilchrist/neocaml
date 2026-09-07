@@ -223,15 +223,6 @@ recomputed from scratch."
       (signal 'buttercup-pending
               "tsx tree-sitter grammar or Emacs 30+ not available")))
 
-  (it "resolves a position inside a JSX region to the tsx language"
-    (with-temp-buffer
-      (insert neocaml-mlx-test--react-component)
-      (neocaml-mlx-mode)
-      (treesit-update-ranges)
-      (goto-char (point-min))
-      (search-forward "<h1>")
-      (expect (treesit-language-at (match-beginning 0)) :to-equal 'tsx)))
-
   (it "indents a nested JSX element under its parent"
     (with-temp-buffer
       (insert "let[@react.component] make () =\n  <div>\n<h1>hi</h1>\n  </div>\n;;")
